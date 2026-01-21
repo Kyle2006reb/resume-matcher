@@ -51,7 +51,7 @@ class ResumeAnalyzer:
         ]
         
     def extract_text_from_file(self, file):
-        """Extract text from PDF or image"""
+        """Extract text from PDF using PyPDF2"""
         file_bytes = file.read()
         file_type = file.content_type
         
@@ -73,12 +73,14 @@ class ResumeAnalyzer:
             raise Exception(f"Text extraction failed: {str(e)}")
     
     def clean_job_description(self, jd_text):
+        """Step 1: Strip job description to raw text"""
         cleaned = jd_text.lower()
         for pattern in self.fluff_patterns:
             cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
         return cleaned
     
     def extract_hard_skills(self, text):
+        """Step 2: Identify hard skill nouns"""
         hard_skills = set()
         
         for pattern in self.tech_patterns:
@@ -103,6 +105,7 @@ class ResumeAnalyzer:
         return hard_skills
     
     def extract_keywords(self, text):
+        """Extract all meaningful keywords"""
         tokens = word_tokenize(text.lower())
         keywords = [
             token for token in tokens 
@@ -117,17 +120,20 @@ class ResumeAnalyzer:
         return all_keywords
     
     def find_repeated_phrases(self, text):
+        """Step 3: Extract repeated phrases"""
         keywords = self.extract_keywords(text)
         counter = Counter(keywords)
         repeated = {k: v for k, v in counter.items() if v >= 2}
         return repeated
     
     def normalize_verbs(self, text):
+        """Step 4: Convert verbs to root forms"""
         tokens = word_tokenize(text.lower())
         stemmed = [self.stemmer.stem(token) for token in tokens]
         return ' '.join(stemmed)
     
     def extract_implicit_keywords(self, text):
+        """Step 5: Extract implicit keywords"""
         implicit_map = {
             'cross functional': ['communication', 'collaboration', 'teamwork'],
             'end to end': ['project management', 'ownership', 'accountability'],
@@ -146,6 +152,7 @@ class ResumeAnalyzer:
         return implicit_skills
     
     def calculate_match_score(self, resume_text, jd_text):
+        """Calculate comprehensive matching score"""
         jd_cleaned = self.clean_job_description(jd_text)
         
         jd_keywords = set(self.extract_keywords(jd_cleaned))
@@ -225,6 +232,13 @@ analyzer = ResumeAnalyzer()
 @app.route('/')
 def serve():
     return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    if os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/analyze', methods=['POST'])
 def analyze_resume():
