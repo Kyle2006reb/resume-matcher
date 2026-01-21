@@ -1,8 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import pytesseract
-from PIL import Image
-import pdf2image
 import io
 import re
 from collections import Counter
@@ -13,7 +10,6 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
-import tempfile
 import os
 
 # Download required NLTK data
@@ -55,27 +51,26 @@ class ResumeAnalyzer:
         ]
         
     def extract_text_from_file(self, file):
+        """Extract text from PDF or image"""
         file_bytes = file.read()
         file_type = file.content_type
         
         try:
             if file_type == 'application/pdf':
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
-                    tmp.write(file_bytes)
-                    tmp_path = tmp.name
-                
-                images = pdf2image.convert_from_path(tmp_path)
-                os.unlink(tmp_path)
+                # Use PyPDF2 for PDF extraction
+                import PyPDF2
+                pdf_file = io.BytesIO(file_bytes)
+                pdf_reader = PyPDF2.PdfReader(pdf_file)
                 
                 text = ''
-                for img in images:
-                    text += pytesseract.image_to_string(img) + '\n'
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + '\n'
                 return text
             else:
-                image = Image.open(io.BytesIO(file_bytes))
-                return pytesseract.image_to_string(image)
+                # For images, return error message
+                return "Image upload not supported. Please upload a text-based PDF resume."
         except Exception as e:
-            raise Exception(f"OCR extraction failed: {str(e)}")
+            raise Exception(f"Text extraction failed: {str(e)}")
     
     def clean_job_description(self, jd_text):
         cleaned = jd_text.lower()
